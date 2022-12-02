@@ -29,12 +29,16 @@ def get_environment_hook_template_path(name):
 
 
 def get_package_level_template_names(all_platforms=False):
-    names = ['local_setup.%s.in' % ext for ext in [
-        'bash',
-        'bat',
-        'sh',
-        'zsh',
-    ]]
+    names = [
+        f'local_setup.{ext}.in'
+        for ext in [
+            'bash',
+            'bat',
+            'sh',
+            'zsh',
+        ]
+    ]
+
     if not all_platforms:
         names = [name for name in names if _is_platform_specific_extension(name)]
     return names
@@ -52,9 +56,11 @@ def get_prefix_level_template_names(*, all_platforms=False):
         'sh.in',
         'zsh',
     ]
-    names = ['local_setup.%s' % ext for ext in extensions] + \
-        ['setup.%s' % ext for ext in extensions] + \
-        ['_local_setup_util.py']
+    names = (
+        [f'local_setup.{ext}' for ext in extensions]
+        + [f'setup.{ext}' for ext in extensions]
+    ) + ['_local_setup_util.py']
+
     if not all_platforms:
         names = [name for name in names if _is_platform_specific_extension(name)]
     return names
@@ -94,9 +100,8 @@ def configure_string(template, environment):
     """
     def substitute(match):
         var = match.group(0)[1:-1]
-        if var in environment:
-            return environment[var]
-        return ''
+        return environment[var] if var in environment else ''
+
     return re.sub(r'\@[a-zA-Z0-9_]+\@', substitute, template)
 
 
@@ -106,7 +111,4 @@ def _is_platform_specific_extension(filename):
     if not IS_WINDOWS and filename.endswith('.bat'):
         # On non-Windows system, ignore .bat
         return False
-    if IS_WINDOWS and os.path.splitext(filename)[1] not in ['.bat', '.py']:
-        # On Windows, ignore anything other than .bat and .py
-        return False
-    return True
+    return not IS_WINDOWS or os.path.splitext(filename)[1] in ['.bat', '.py']

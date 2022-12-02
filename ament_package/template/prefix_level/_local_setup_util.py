@@ -64,16 +64,14 @@ def main(argv=sys.argv[1:]):  # noqa: D103
         FORMAT_STR_REMOVE_TRAILING_SEPARATOR = \
             'call:_ament_prefix_bat_strip_trailing_semicolon "{name}"'
     else:
-        assert False, 'Unknown primary extension: ' + args.primary_extension
+        assert False, f'Unknown primary extension: {args.primary_extension}'
 
     packages = get_packages(Path(__file__).parent)
 
     ordered_packages = order_packages(packages)
     for pkg_name in ordered_packages:
         if _include_comments():
-            print(
-                FORMAT_STR_COMMENT_LINE.format_map(
-                    {'comment': 'Package: ' + pkg_name}))
+            print(FORMAT_STR_COMMENT_LINE.format_map({'comment': f'Package: {pkg_name}'}))
         prefix = os.path.abspath(os.path.dirname(__file__))
         for line in get_commands(
             pkg_name, prefix, args.primary_extension,
@@ -111,7 +109,7 @@ def get_packages(prefix_path):
 
     # remove unknown dependencies
     pkg_names = set(packages.keys())
-    for k in packages.keys():
+    for k in packages:
         packages[k] = {d for d in packages[k] if d in pkg_names}
 
     return packages
@@ -180,10 +178,8 @@ def reduce_cycle_set(packages):
         for name in list(packages.keys()):
             if name not in depended:
                 del packages[name]
-        if last_depended:
-            # if remaining packages haven't changed return them
-            if last_depended == depended:
-                return packages.keys()
+        if last_depended and last_depended == depended:
+            return packages.keys()
         # otherwise reduce again
         last_depended = depended
 
@@ -205,7 +201,9 @@ def get_commands(pkg_name, prefix, primary_extension, additional_extension):
             [additional_extension] if additional_extension else []
         ) + [primary_extension]:
             package_ext_path = os.path.join(
-                prefix, 'share', pkg_name, 'local_setup.' + ext)
+                prefix, 'share', pkg_name, f'local_setup.{ext}'
+            )
+
             if os.path.exists(package_ext_path):
                 commands += [
                     FORMAT_STR_INVOKE_SCRIPT.format_map({
@@ -260,7 +258,7 @@ def process_dsv_file(
     for basename, extensions in basenames.items():
         if not os.path.isabs(basename):
             basename = os.path.join(prefix, basename)
-        if os.path.exists(basename + '.dsv'):
+        if os.path.exists(f'{basename}.dsv'):
             extensions.add('dsv')
 
     for basename, extensions in basenames.items():
@@ -269,20 +267,34 @@ def process_dsv_file(
         if 'dsv' in extensions:
             # process dsv files recursively
             commands += process_dsv_file(
-                basename + '.dsv', prefix, primary_extension=primary_extension,
-                additional_extension=additional_extension)
+                f'{basename}.dsv',
+                prefix,
+                primary_extension=primary_extension,
+                additional_extension=additional_extension,
+            )
+
         elif primary_extension in extensions and len(extensions) == 1:
             # source primary-only files
             commands += [
-                FORMAT_STR_INVOKE_SCRIPT.format_map({
-                    'prefix': prefix,
-                    'script_path': basename + '.' + primary_extension})]
+                FORMAT_STR_INVOKE_SCRIPT.format_map(
+                    {
+                        'prefix': prefix,
+                        'script_path': f'{basename}.{primary_extension}',
+                    }
+                )
+            ]
+
         elif additional_extension in extensions:
             # source non-primary files
             commands += [
-                FORMAT_STR_INVOKE_SCRIPT.format_map({
-                    'prefix': prefix,
-                    'script_path': basename + '.' + additional_extension})]
+                FORMAT_STR_INVOKE_SCRIPT.format_map(
+                    {
+                        'prefix': prefix,
+                        'script_path': f'{basename}.{additional_extension}',
+                    }
+                )
+            ]
+
 
     return commands
 
@@ -337,8 +349,7 @@ def handle_dsv_types_except_source(type_, remainder, prefix):
             else:
                 commands += _prepend_unique_value(env_name, value)
     else:
-        raise RuntimeError(
-            'contains an unknown environment hook type: ' + type_)
+        raise RuntimeError(f'contains an unknown environment hook type: {type_}')
     return commands
 
 
@@ -360,10 +371,10 @@ def _append_unique_value(name, value):
         {'name': name, 'value': extend + value})
     if value not in env_state[name]:
         env_state[name].add(value)
-    else:
-        if not _include_comments():
-            return []
+    elif _include_comments():
         line = FORMAT_STR_COMMENT_LINE.format_map({'comment': line})
+    else:
+        return []
     return [line]
 
 
@@ -382,10 +393,10 @@ def _prepend_unique_value(name, value):
         {'name': name, 'value': value + extend})
     if value not in env_state[name]:
         env_state[name].add(value)
-    else:
-        if not _include_comments():
-            return []
+    elif _include_comments():
         line = FORMAT_STR_COMMENT_LINE.format_map({'comment': line})
+    else:
+        return []
     return [line]
 
 
@@ -423,6 +434,6 @@ if __name__ == '__main__':  # pragma: no cover
     try:
         rc = main()
     except RuntimeError as e:
-        print(str(e), file=sys.stderr)
+        print(e, file=sys.stderr)
         rc = 1
     sys.exit(rc)
